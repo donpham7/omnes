@@ -23,7 +23,6 @@ initialize_app()
 @https_fn.on_call()
 def upload_epic(request: https_fn.CallableRequest) -> https_fn.Response:
     epic_data = request.data
-    print(epic_data)
     try:
         epic = Epic.from_dict(epic_data)
     except Exception as e:
@@ -68,7 +67,6 @@ def update_epic(req: https_fn.Request) -> https_fn.Response:
     if not update_data:
         raise https_fn.HttpsError("invalid-argument", "No data provided for update")
     try:
-        print("Updating epic:", epic_id, "with data:", update_data)
         return patch_epic_in_db_with_fields(epic_id, update_data).to_dict()
     except Exception as e:
         raise https_fn.HttpsError("internal", f"Error updating epic: {e}")
@@ -113,26 +111,27 @@ def upload_story(request: https_fn.CallableRequest) -> https_fn.Response:
     except Exception as e:
         raise https_fn.HttpsError("internal", f"Error uploading story: {e}")
 
-    try:
-        # Append the new story ID to the epic's child_user_stories array
-        # Get epic child_user_stories and append
-        query_params = {
-            "epic_id": story.epic_id,
-        }
-        epic = get_epics_from_db(query_params)[0]
-        if not epic:
-            raise https_fn.HttpsError("not-found", "Epic not found")
+    if story.epic_id != "":
+        try:
+            # Append the new story ID to the epic's child_user_stories array
+            # Get epic child_user_stories and append
+            query_params = {
+                "epic_id": story.epic_id,
+            }
+            epic = get_epics_from_db(query_params)[0]
+            if not epic:
+                raise https_fn.HttpsError("not-found", "Epic not found")
 
-        patch_epic_in_db_with_fields(
-            epic.epic_id,
-            {"child_user_stories": epic.child_user_stories + [story.story_id]},
-        )
+            patch_epic_in_db_with_fields(
+                epic.epic_id,
+                {"child_user_stories": epic.child_user_stories + [story.story_id]},
+            )
 
-    except Exception as e:
-        story_ref.delete()
-        raise https_fn.HttpsError(
-            "internal", f"Error updating epic with new story: {e}"
-        )
+        except Exception as e:
+            story_ref.delete()
+            raise https_fn.HttpsError(
+                "internal", f"Error updating epic with new story: {e}"
+            )
     return story.to_dict()
 
 
@@ -187,7 +186,7 @@ def upload_task(request: https_fn.CallableRequest) -> https_fn.Response:
         raise https_fn.HttpsError("internal", f"Error uploading task: {e}")
 
     # Update the story to include this task in its child_tasks
-    if task.story_id is not None:
+    if task.story_id != "":
         try:
             story = get_stories_from_db({"story_id": task.story_id})[0]
             if not story:
