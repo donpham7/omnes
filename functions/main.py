@@ -29,13 +29,10 @@ def upload_epic(request: https_fn.CallableRequest) -> https_fn.Response:
         raise https_fn.HttpsError("invalid-argument", f"Error parsing epic data: {e}")
 
     try:
-        Epic.to_firestore(epic, firestore.client())
+        epic_ref = Epic.to_firestore(epic, firestore.client())
     except Exception as e:
         raise https_fn.HttpsError("internal", f"Error uploading epic: {e}")
-    return {
-        "status": "success",
-        "id": epic.id,
-    }
+    return Epic.from_firestore(epic_ref.get()).to_dict()
 
 
 @https_fn.on_request()

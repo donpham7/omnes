@@ -18,7 +18,7 @@ class Epic:
         child_user_stories: list = [],
         assigned_user_id: str = None,
         due_date: str = "",  # format: "YYYY-MM-DD"
-        created_at: str = datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        created_at: str = datetime.date.today().isoformat(),
     ):
         if status not in STATUSES:
             raise ValueError(f"Invalid status: {status}. Must be one of {STATUSES}")
@@ -104,7 +104,7 @@ class Story:
         assigned_user_id: str = None,
         epic_id: str = None,
         due_date: str = None,
-        created_at: str = datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        created_at: str = datetime.date.today().isoformat(),
     ):
         if status not in STATUSES:
             raise ValueError(f"Invalid status: {status}. Must be one of {STATUSES}")
@@ -184,7 +184,7 @@ class Task:
         assigned_user_id: str = None,
         story_id: str = None,
         due_date: str = None,
-        created_at: str = datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        created_at: str = datetime.date.today().isoformat(),
     ):
         if status not in STATUSES:
             raise ValueError(f"Invalid status: {status}. Must be one of {STATUSES}")
