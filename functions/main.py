@@ -38,12 +38,10 @@ def upload_epic(request: https_fn.CallableRequest) -> https_fn.Response:
 
 
 @https_fn.on_request()
-def get_assigned_epics(req: https_fn.Request) -> https_fn.Response:
+def get_epics(req: https_fn.Request) -> https_fn.Response:
     creator_id = req.args.get("creator_id", None)
     assigned_user_id = req.args.get("assigned_user_id", None)
     status = req.args.get("status", None)
-    if not assigned_user_id:
-        return https_fn.Response("Missing assigned_user_id parameter", status=400)
 
     query_params = {
         "creator_id": creator_id,
@@ -53,6 +51,31 @@ def get_assigned_epics(req: https_fn.Request) -> https_fn.Response:
     # Fetch epics for the user from your database or other service
     epics = get_epics_from_db(query_params)
     return epics
+
+
+@https_fn.on_request()
+def get_epic_from_task(req: https_fn.Request) -> https_fn.Response:
+    task_id = req.args.get("task_id", None)
+    if not task_id:
+        raise https_fn.HttpsError("invalid-argument", "task_id is required")
+
+    query_params = {
+        "task_id": task_id,
+    }
+
+    # Fetch Story for the task
+    task = get_tasks_from_db(query_params)
+
+    query_params = {
+        "story_id": task[0].get("story_id"),
+    }
+    story = get_stories_from_db(query_params)
+
+    query_params = {
+        "epic_id": story[0].get("epic_id"),
+    }
+    epic = get_epics_from_db(query_params)
+    return epic
 
 
 @https_fn.on_call()
@@ -74,13 +97,11 @@ def upload_story(request: https_fn.CallableRequest) -> https_fn.Response:
 
 
 @https_fn.on_request()
-def get_assigned_stories(req: https_fn.Request) -> https_fn.Response:
+def get_stories(req: https_fn.Request) -> https_fn.Response:
     creator_id = req.args.get("creator_id", None)
     assigned_user_id = req.args.get("assigned_user_id", None)
     epic_id = req.args.get("epic_id", None)
     status = req.args.get("status", None)
-    if not assigned_user_id:
-        return https_fn.Response("Missing assigned_user_id parameter", status=400)
 
     query_params = {
         "creator_id": creator_id,
@@ -112,14 +133,12 @@ def upload_task(request: https_fn.CallableRequest) -> https_fn.Response:
 
 
 @https_fn.on_request()
-def get_assigned_tasks(req: https_fn.Request) -> https_fn.Response:
+def get_tasks(req: https_fn.Request) -> https_fn.Response:
     creator_id = req.args.get("creator_id", None)
     assigned_user_id = req.args.get("assigned_user_id", None)
     epic_id = req.args.get("epic_id", None)
     story_id = req.args.get("story_id", None)
     status = req.args.get("status", None)
-    if not assigned_user_id:
-        return https_fn.Response("Missing assigned_user_id parameter", status=400)
 
     query_params = {
         "creator_id": creator_id,
@@ -130,6 +149,34 @@ def get_assigned_tasks(req: https_fn.Request) -> https_fn.Response:
     }
     # Fetch tasks for the user from your database or other service
     tasks = get_tasks_from_db(query_params)
+    return tasks
+
+
+@https_fn.on_request()
+def get_tasks_from_epic(req: https_fn.Request) -> https_fn.Response:
+    epic_id = req.args.get("epic_id", None)
+    if not epic_id:
+        raise https_fn.HttpsError("invalid-argument", "epic_id is required")
+    status = req.args.get("status", None)
+
+    query_params = {
+        "epic_id": epic_id,
+        "status": status,
+    }
+    # Fetch stories for the epic
+    stories_from_epic = get_stories_from_db(query_params)
+
+    # Fetch tasks for each story
+    tasks = []
+    for story in stories_from_epic:
+        story_id = story.get("story_id")
+        if story_id:
+            story_query_params = {
+                "story_id": story_id,
+                "status": status,
+            }
+            story_tasks = get_tasks_from_db(story_query_params)
+            tasks.extend(story_tasks)
     return tasks
 
 
@@ -151,6 +198,8 @@ def get_tasks_from_db(query_params: dict) -> list:
         tasks_ref = tasks_ref.where("story_id", "==", query_params["story_id"])
     if query_params.get("status"):
         tasks_ref = tasks_ref.where("status", "==", query_params["status"])
+    if query_params.get("task_id"):
+        tasks_ref = tasks_ref.where("task_id", "==", query_params["task_id"])
 
     return [doc.to_dict() for doc in tasks_ref.stream()]
 
@@ -170,6 +219,8 @@ def get_stories_from_db(query_params: dict) -> list:
         stories_ref = stories_ref.where("epic_id", "==", query_params["epic_id"])
     if query_params.get("status"):
         stories_ref = stories_ref.where("status", "==", query_params["status"])
+    if query_params.get("story_id"):
+        stories_ref = stories_ref.where("story_id", "==", query_params["story_id"])
 
     return [doc.to_dict() for doc in stories_ref.stream()]
 
@@ -187,5 +238,7 @@ def get_epics_from_db(query_params: dict) -> list:
         )
     if query_params.get("status"):
         epics_ref = epics_ref.where("status", "==", query_params["status"])
+    if query_params.get("epic_id"):
+        epics_ref = epics_ref.where("epic_id", "==", query_params["epic_id"])
 
     return [doc.to_dict() for doc in epics_ref.stream()]
