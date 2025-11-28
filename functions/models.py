@@ -1,6 +1,7 @@
 from firebase_admin import initialize_app, auth, firestore
 from firebase_admin.firestore import Client
 import uuid
+import datetime
 
 STATUSES = ["Pending", "In Progress", "Completed"]
 
@@ -9,46 +10,62 @@ STATUSES = ["Pending", "In Progress", "Completed"]
 class Epic:
     def __init__(
         self,
-        epic_id: str,
+        id: str,
         name: str,
         description: str,
         creator_id: str,
         status: str,
         child_user_stories: list = [],
         assigned_user_id: str = None,
+        due_date: str = "",  # format: "YYYY-MM-DD"
+        created_at: str = datetime.datetime.now(datetime.timezone.utc).isoformat(),
     ):
         if status not in STATUSES:
             raise ValueError(f"Invalid status: {status}. Must be one of {STATUSES}")
-        self.epic_id = epic_id
+        self.id = id
         self.name = name
         self.description = description
         self.creator_id = creator_id
         self.assigned_user_id = assigned_user_id
         self.child_user_stories = child_user_stories
         self.status = status
+        if due_date != "":
+            try:
+                datetime.datetime.strptime(due_date, "%Y-%m-%d")
+                self.due_date = due_date
+            except ValueError:
+                raise ValueError(
+                    f"Invalid due_date format: {due_date}. Must be YYYY-MM-DD"
+                )
+        else:
+            self.due_date = ""
+        self.created_at = created_at
 
     def to_dict(self) -> dict:
         return {
-            "epic_id": self.epic_id,
+            "id": self.id,
             "name": self.name,
             "description": self.description,
             "creator_id": self.creator_id,
             "child_user_stories": self.child_user_stories,
             "assigned_user_id": self.assigned_user_id,
             "status": self.status,
+            "due_date": self.due_date,
+            "created_at": self.created_at,
         }
 
     @staticmethod
     def from_dict(data: dict, id: str = None):
         try:
             return Epic(
-                epic_id=id or uuid.uuid4().hex,
+                id=id or uuid.uuid4().hex,
                 name=data["name"],
                 description=data["description"],
                 creator_id=data["creator_id"],
                 status=data["status"],
                 assigned_user_id=data["assigned_user_id"],
                 child_user_stories=data["child_user_stories"],
+                due_date=data["due_date"],
             )
         except KeyError as e:
             raise ValueError(f"Missing required field: {e}")
@@ -57,18 +74,20 @@ class Epic:
     def from_firestore(doc) -> "Epic":
         data = doc.to_dict()
         return Epic(
-            epic_id=doc.id,
+            id=doc.id,
             name=data["name"],
             description=data["description"],
             creator_id=data["creator_id"],
             status=data["status"],
             assigned_user_id=data["assigned_user_id"],
             child_user_stories=data["child_user_stories"],
+            due_date=data["due_date"],
+            created_at=data["created_at"],
         )
 
     @staticmethod
     def to_firestore(epic: "Epic", db: Client) -> dict:
-        epic_ref = db.collection("epics").document(epic.epic_id)
+        epic_ref = db.collection("epics").document(epic.id)
         epic_ref.set(epic.to_dict())
         return epic_ref
 
@@ -76,7 +95,7 @@ class Epic:
 class Story:
     def __init__(
         self,
-        story_id: str,
+        id: str,
         name: str,
         description: str,
         status: str,
@@ -84,10 +103,12 @@ class Story:
         child_tasks: list = [],
         assigned_user_id: str = None,
         epic_id: str = None,
+        due_date: str = None,
+        created_at: str = datetime.datetime.now(datetime.timezone.utc).isoformat(),
     ):
         if status not in STATUSES:
             raise ValueError(f"Invalid status: {status}. Must be one of {STATUSES}")
-        self.story_id = story_id
+        self.id = id
         self.name = name
         self.description = description
         self.status = status
@@ -95,10 +116,12 @@ class Story:
         self.child_tasks = child_tasks
         self.creator_id = creator_id
         self.assigned_user_id = assigned_user_id
+        self.due_date = due_date
+        self.created_at = created_at
 
     def to_dict(self) -> dict:
         return {
-            "story_id": self.story_id,
+            "id": self.id,
             "name": self.name,
             "description": self.description,
             "status": self.status,
@@ -106,13 +129,15 @@ class Story:
             "child_tasks": self.child_tasks,
             "creator_id": self.creator_id,
             "assigned_user_id": self.assigned_user_id,
+            "due_date": self.due_date,
+            "created_at": self.created_at,
         }
 
     @staticmethod
     def from_dict(data: dict, id: str = None):
         try:
             return Story(
-                story_id=id or uuid.uuid4().hex,
+                id=id or uuid.uuid4().hex,
                 name=data["name"],
                 description=data["description"],
                 status=data["status"],
@@ -120,6 +145,7 @@ class Story:
                 child_tasks=data["child_tasks"],
                 creator_id=data["creator_id"],
                 assigned_user_id=data["assigned_user_id"],
+                due_date=data["due_date"],
             )
         except KeyError as e:
             raise ValueError(f"Missing required field: {e}")
@@ -128,7 +154,7 @@ class Story:
     def from_firestore(doc) -> "Story":
         data = doc.to_dict()
         return Story(
-            story_id=doc.id,
+            id=doc.id,
             name=data["name"],
             description=data["description"],
             status=data["status"],
@@ -136,11 +162,13 @@ class Story:
             child_tasks=data["child_tasks"],
             creator_id=data["creator_id"],
             assigned_user_id=data["assigned_user_id"],
+            due_date=data["due_date"],
+            created_at=data["created_at"],
         )
 
     @staticmethod
     def to_firestore(story: "Story", db: Client) -> dict:
-        story_ref = db.collection("stories").document(story.story_id)
+        story_ref = db.collection("stories").document(story.id)
         story_ref.set(story.to_dict())
         return story_ref
 
@@ -148,46 +176,53 @@ class Story:
 class Task:
     def __init__(
         self,
-        task_id: str,
+        id: str,
         name: str,
         description: str,
         status: str,
         creator_id: str,
         assigned_user_id: str = None,
         story_id: str = None,
+        due_date: str = None,
+        created_at: str = datetime.datetime.now(datetime.timezone.utc).isoformat(),
     ):
         if status not in STATUSES:
             raise ValueError(f"Invalid status: {status}. Must be one of {STATUSES}")
-        self.task_id = task_id
+        self.id = id
         self.creator_id = creator_id
         self.name = name
         self.description = description
         self.status = status
         self.story_id = story_id
         self.assigned_user_id = assigned_user_id
+        self.due_date = due_date
+        self.created_at = created_at
 
     def to_dict(self) -> dict:
         return {
-            "task_id": self.task_id,
+            "id": self.id,
             "name": self.name,
             "description": self.description,
             "status": self.status,
             "story_id": self.story_id,
             "creator_id": self.creator_id,
             "assigned_user_id": self.assigned_user_id,
+            "due_date": self.due_date,
+            "created_at": self.created_at,
         }
 
     @staticmethod
     def from_dict(data: dict, id: str = None):
         try:
             task = Task(
-                task_id=id or uuid.uuid4().hex,
+                id=id or uuid.uuid4().hex,
                 name=data["name"],
                 description=data["description"],
                 status=data["status"],
                 story_id=data["story_id"],
                 creator_id=data["creator_id"],
                 assigned_user_id=data["assigned_user_id"],
+                due_date=data["due_date"],
             )
             return task
         except KeyError as e:
@@ -197,17 +232,19 @@ class Task:
     def from_firestore(doc) -> "Task":
         data = doc.to_dict()
         return Task(
-            task_id=doc.id,
+            id=doc.id,
             name=data["name"],
             description=data["description"],
             status=data["status"],
             story_id=data["story_id"],
             creator_id=data["creator_id"],
             assigned_user_id=data["assigned_user_id"],
+            due_date=data["due_date"],
+            created_at=data["created_at"],
         )
 
     @staticmethod
     def to_firestore(task: "Task", db: Client) -> dict:
-        task_ref = db.collection("tasks").document(task.task_id)
+        task_ref = db.collection("tasks").document(task.id)
         task_ref.set(task.to_dict())
         return task_ref

@@ -34,7 +34,7 @@ def upload_epic(request: https_fn.CallableRequest) -> https_fn.Response:
         raise https_fn.HttpsError("internal", f"Error uploading epic: {e}")
     return {
         "status": "success",
-        "epic_id": epic.epic_id,
+        "id": epic.id,
     }
 
 
@@ -59,27 +59,27 @@ def update_epic(req: https_fn.Request) -> https_fn.Response:
     if req.method != "PATCH":
         raise https_fn.HttpsError("invalid-argument", "Invalid request method")
 
-    epic_id = req.args.get("epic_id", None)
-    if not epic_id:
-        raise https_fn.HttpsError("invalid-argument", "epic_id is required")
+    id = req.args.get("id", None)
+    if not id:
+        raise https_fn.HttpsError("invalid-argument", "id is required")
 
     update_data = json.loads(req.data)["data"]
     if not update_data:
         raise https_fn.HttpsError("invalid-argument", "No data provided for update")
     try:
-        return patch_epic_in_db_with_fields(epic_id, update_data).to_dict()
+        return patch_epic_in_db_with_fields(id, update_data).to_dict()
     except Exception as e:
         raise https_fn.HttpsError("internal", f"Error updating epic: {e}")
 
 
 @https_fn.on_request()
 def get_epic_from_task(req: https_fn.Request) -> https_fn.Response:
-    task_id = req.args.get("task_id", None)
-    if not task_id:
-        raise https_fn.HttpsError("invalid-argument", "task_id is required")
+    id = req.args.get("id", None)
+    if not id:
+        raise https_fn.HttpsError("invalid-argument", "id is required")
 
     query_params = {
-        "task_id": task_id,
+        "id": id,
     }
 
     # Fetch Story for the task
@@ -91,7 +91,7 @@ def get_epic_from_task(req: https_fn.Request) -> https_fn.Response:
     story = get_stories_from_db(query_params)
 
     query_params = {
-        "epic_id": story[0].epic_id,
+        "id": story[0].epic_id,
     }
     epic = get_epics_from_db(query_params)[0]
     return epic.to_dict()
@@ -116,15 +116,15 @@ def upload_story(request: https_fn.CallableRequest) -> https_fn.Response:
             # Append the new story ID to the epic's child_user_stories array
             # Get epic child_user_stories and append
             query_params = {
-                "epic_id": story.epic_id,
+                "id": story.epic_id,
             }
             epic = get_epics_from_db(query_params)[0]
             if not epic:
                 raise https_fn.HttpsError("not-found", "Epic not found")
 
             patch_epic_in_db_with_fields(
-                epic.epic_id,
-                {"child_user_stories": epic.child_user_stories + [story.story_id]},
+                epic.id,
+                {"child_user_stories": epic.child_user_stories + [story.id]},
             )
 
         except Exception as e:
@@ -158,15 +158,15 @@ def update_story(req: https_fn.Request) -> https_fn.Response:
     if req.method != "PATCH":
         raise https_fn.HttpsError("invalid-argument", "Invalid request method")
 
-    story_id = req.args.get("story_id", None)
-    if not story_id:
-        raise https_fn.HttpsError("invalid-argument", "story_id is required")
+    id = req.args.get("id", None)
+    if not id:
+        raise https_fn.HttpsError("invalid-argument", "id is required")
 
     update_data = json.loads(req.data)["data"]
     if not update_data:
         raise https_fn.HttpsError("invalid-argument", "No data provided for update")
     try:
-        return patch_story_in_db_with_fields(story_id, update_data).to_dict()
+        return patch_story_in_db_with_fields(id, update_data).to_dict()
     except Exception as e:
         raise https_fn.HttpsError("internal", f"Error updating story: {e}")
 
@@ -188,13 +188,13 @@ def upload_task(request: https_fn.CallableRequest) -> https_fn.Response:
     # Update the story to include this task in its child_tasks
     if task.story_id != "":
         try:
-            story = get_stories_from_db({"story_id": task.story_id})[0]
+            story = get_stories_from_db({"id": task.story_id})[0]
             if not story:
                 raise https_fn.HttpsError("not-found", "Story not found")
 
             story = patch_story_in_db_with_fields(
-                story_id=story.story_id,
-                update_data={"child_tasks": story.child_tasks + [task.task_id]},
+                id=story.id,
+                update_data={"child_tasks": story.child_tasks + [task.id]},
             )
         except Exception as e:
             task_ref.delete()
@@ -226,22 +226,23 @@ def get_tasks(req: https_fn.Request) -> https_fn.Response:
 
 @https_fn.on_request()
 def get_tasks_from_epic(req: https_fn.Request) -> https_fn.Response:
-    epic_id = req.args.get("epic_id", None)
-    if not epic_id:
-        raise https_fn.HttpsError("invalid-argument", "epic_id is required")
+    id = req.args.get("id", None)
+    if not id:
+        raise https_fn.HttpsError("invalid-argument", "id is required")
     status = req.args.get("status", None)
 
     query_params = {
-        "epic_id": epic_id,
+        "epic_id": id,
         "status": status,
     }
     # Fetch stories for the epic
+    print("Fetching stories with query params:", query_params)
     stories_from_epic = get_stories_from_db(query_params)
 
     # Fetch tasks for each story
     tasks = []
     for story in stories_from_epic:
-        story_id = story.story_id
+        story_id = story.id
         if story_id:
             story_query_params = {
                 "story_id": story_id,
@@ -257,15 +258,15 @@ def update_task(req: https_fn.Request) -> https_fn.Response:
     if req.method != "PATCH":
         raise https_fn.HttpsError("invalid-argument", "Invalid request method")
 
-    task_id = req.args.get("task_id", None)
-    if not task_id:
-        raise https_fn.HttpsError("invalid-argument", "task_id is required")
+    id = req.args.get("id", None)
+    if not id:
+        raise https_fn.HttpsError("invalid-argument", "id is required")
 
     update_data = json.loads(req.data)["data"]
     if not update_data:
         raise https_fn.HttpsError("invalid-argument", "No data provided for update")
     try:
-        return patch_task_in_db_with_fields(task_id, update_data).to_dict()
+        return patch_task_in_db_with_fields(id, update_data).to_dict()
     except Exception as e:
         raise https_fn.HttpsError("internal", f"Error updating task: {e}")
 
@@ -288,15 +289,15 @@ def get_tasks_from_db(query_params: dict) -> list:
         tasks_ref = tasks_ref.where("story_id", "==", query_params["story_id"])
     if query_params.get("status"):
         tasks_ref = tasks_ref.where("status", "==", query_params["status"])
-    if query_params.get("task_id"):
-        tasks_ref = tasks_ref.where("task_id", "==", query_params["task_id"])
+    if query_params.get("id"):
+        tasks_ref = tasks_ref.where("id", "==", query_params["id"])
 
     return [Task.from_firestore(doc) for doc in tasks_ref.stream()]
 
 
-def patch_task_in_db_with_fields(task_id: str, update_data: dict) -> None:
+def patch_task_in_db_with_fields(id: str, update_data: dict) -> None:
     db = firestore.client()
-    task_ref = db.collection("tasks").document(task_id)
+    task_ref = db.collection("tasks").document(id)
     # Only update the fields provided in update_data
     task_ref.update(update_data)
     task = Task.from_firestore(task_ref.get())
@@ -324,9 +325,9 @@ def get_stories_from_db(query_params: dict) -> list:
     return [Story.from_firestore(doc) for doc in stories_ref.stream()]
 
 
-def patch_story_in_db_with_fields(story_id: str, update_data: dict) -> None:
+def patch_story_in_db_with_fields(id: str, update_data: dict) -> None:
     db = firestore.client()
-    story_ref = db.collection("stories").document(story_id)
+    story_ref = db.collection("stories").document(id)
     # Only update the fields provided in update_data
     story_ref.update(update_data)
     story = Story.from_firestore(story_ref.get())
@@ -346,15 +347,15 @@ def get_epics_from_db(query_params: dict) -> list:
         )
     if query_params.get("status"):
         epics_ref = epics_ref.where("status", "==", query_params["status"])
-    if query_params.get("epic_id"):
-        epics_ref = epics_ref.where("epic_id", "==", query_params["epic_id"])
+    if query_params.get("id"):
+        epics_ref = epics_ref.where("id", "==", query_params["id"])
 
     return [Epic.from_firestore(doc) for doc in epics_ref.stream()]
 
 
-def patch_epic_in_db_with_fields(epic_id: str, update_data: dict) -> Epic:
+def patch_epic_in_db_with_fields(id: str, update_data: dict) -> Epic:
     db = firestore.client()
-    epic_ref = db.collection("epics").document(epic_id)
+    epic_ref = db.collection("epics").document(id)
     # Only update the fields provided in update_data
     epic_ref.update(update_data)
     epic = Epic.from_firestore(epic_ref.get())
