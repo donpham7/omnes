@@ -173,7 +173,7 @@ def upload_task(request: https_fn.CallableRequest) -> https_fn.Response:
             if not story:
                 raise https_fn.HttpsError("not-found", "Story not found")
 
-            patch_story_in_db_with_fields(
+            story = patch_story_in_db_with_fields(
                 story_id=story.story_id,
                 update_data={"child_tasks": story.child_tasks + [task.task_id]},
             )
