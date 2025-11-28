@@ -7,7 +7,7 @@ from firebase_functions.options import set_global_options
 from firebase_admin import initialize_app, auth, firestore
 from models import Epic, Story, Task
 import uuid
-from flask import Response
+from flask import Response, json
 
 # For cost control, you can set the maximum number of containers that can be
 # running at the same time. This helps mitigate the impact of unexpected
@@ -23,6 +23,7 @@ initialize_app()
 @https_fn.on_call()
 def upload_epic(request: https_fn.CallableRequest) -> https_fn.Response:
     epic_data = request.data
+    print(epic_data)
     try:
         epic = Epic.from_dict(epic_data)
     except Exception as e:
@@ -63,10 +64,11 @@ def update_epic(req: https_fn.Request) -> https_fn.Response:
     if not epic_id:
         raise https_fn.HttpsError("invalid-argument", "epic_id is required")
 
-    update_data = req.data
+    update_data = json.loads(req.data)["data"]
     if not update_data:
         raise https_fn.HttpsError("invalid-argument", "No data provided for update")
     try:
+        print("Updating epic:", epic_id, "with data:", update_data)
         return patch_epic_in_db_with_fields(epic_id, update_data).to_dict()
     except Exception as e:
         raise https_fn.HttpsError("internal", f"Error updating epic: {e}")
@@ -152,6 +154,24 @@ def get_stories(req: https_fn.Request) -> https_fn.Response:
     return [story.to_dict() for story in stories]
 
 
+@https_fn.on_request()
+def update_story(req: https_fn.Request) -> https_fn.Response:
+    if req.method != "PATCH":
+        raise https_fn.HttpsError("invalid-argument", "Invalid request method")
+
+    story_id = req.args.get("story_id", None)
+    if not story_id:
+        raise https_fn.HttpsError("invalid-argument", "story_id is required")
+
+    update_data = json.loads(req.data)["data"]
+    if not update_data:
+        raise https_fn.HttpsError("invalid-argument", "No data provided for update")
+    try:
+        return patch_story_in_db_with_fields(story_id, update_data).to_dict()
+    except Exception as e:
+        raise https_fn.HttpsError("internal", f"Error updating story: {e}")
+
+
 # Tasks
 @https_fn.on_call()
 def upload_task(request: https_fn.CallableRequest) -> https_fn.Response:
@@ -162,7 +182,7 @@ def upload_task(request: https_fn.CallableRequest) -> https_fn.Response:
         raise https_fn.HttpsError("invalid-argument", f"Error parsing task data: {e}")
 
     try:
-        Task.to_firestore(task, firestore.client())
+        task_ref = Task.to_firestore(task, firestore.client())
     except Exception as e:
         raise https_fn.HttpsError("internal", f"Error uploading task: {e}")
 
@@ -178,6 +198,7 @@ def upload_task(request: https_fn.CallableRequest) -> https_fn.Response:
                 update_data={"child_tasks": story.child_tasks + [task.task_id]},
             )
         except Exception as e:
+            task_ref.delete()
             raise https_fn.HttpsError(
                 "internal", f"Error updating story with new task: {e}"
             )
@@ -230,6 +251,24 @@ def get_tasks_from_epic(req: https_fn.Request) -> https_fn.Response:
             story_tasks = get_tasks_from_db(story_query_params)
             tasks.extend(story_tasks)
     return [task.to_dict() for task in tasks]
+
+
+@https_fn.on_request()
+def update_task(req: https_fn.Request) -> https_fn.Response:
+    if req.method != "PATCH":
+        raise https_fn.HttpsError("invalid-argument", "Invalid request method")
+
+    task_id = req.args.get("task_id", None)
+    if not task_id:
+        raise https_fn.HttpsError("invalid-argument", "task_id is required")
+
+    update_data = json.loads(req.data)["data"]
+    if not update_data:
+        raise https_fn.HttpsError("invalid-argument", "No data provided for update")
+    try:
+        return patch_task_in_db_with_fields(task_id, update_data).to_dict()
+    except Exception as e:
+        raise https_fn.HttpsError("internal", f"Error updating task: {e}")
 
 
 # Helpers
