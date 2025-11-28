@@ -80,10 +80,10 @@ class Story:
         name: str,
         description: str,
         status: str,
-        epic_id: str,
         creator_id: str,
         child_tasks: list = [],
         assigned_user_id: str = None,
+        epic_id: str = None,
     ):
         if status not in STATUSES:
             raise ValueError(f"Invalid status: {status}. Must be one of {STATUSES}")
@@ -152,9 +152,9 @@ class Task:
         name: str,
         description: str,
         status: str,
-        story_id: str,
         creator_id: str,
         assigned_user_id: str = None,
+        story_id: str = None,
     ):
         if status not in STATUSES:
             raise ValueError(f"Invalid status: {status}. Must be one of {STATUSES}")
