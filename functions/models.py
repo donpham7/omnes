@@ -1,7 +1,7 @@
 from firebase_admin import initialize_app, auth, firestore
 from firebase_admin.firestore import Client
 import uuid
-import datetime
+from datetime import datetime, timezone
 
 STATUSES = ["Pending", "In Progress", "Completed"]
 
@@ -17,8 +17,8 @@ class Epic:
         status: str,
         child_user_stories: list = [],
         assigned_user_id: str = None,
-        due_date: str = "",  # format: "YYYY-MM-DD"
-        created_at: str = datetime.date.today().isoformat(),
+        due_date: str = "",  # format: "YYYY-MM-DDTHH:MM:SS+00:00" (ISO 8601 with timezone)
+        created_at: str = None,
     ):
         if status not in STATUSES:
             raise ValueError(f"Invalid status: {status}. Must be one of {STATUSES}")
@@ -31,15 +31,17 @@ class Epic:
         self.status = status
         if due_date != "":
             try:
-                datetime.datetime.strptime(due_date, "%Y-%m-%d")
+                datetime.fromisoformat(due_date)
                 self.due_date = due_date
             except ValueError:
                 raise ValueError(
-                    f"Invalid due_date format: {due_date}. Must be YYYY-MM-DD"
+                    f"Invalid due_date format: {due_date}. Must be ISO 8601 format (YYYY-MM-DDTHH:MM:SS+00:00)"
                 )
         else:
             self.due_date = ""
-        self.created_at = created_at
+        self.created_at = (
+            created_at or datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+        )
 
     def to_dict(self) -> dict:
         return {
@@ -104,7 +106,7 @@ class Story:
         assigned_user_id: str = None,
         epic_id: str = None,
         due_date: str = None,
-        created_at: str = datetime.date.today().isoformat(),
+        created_at: str = None,
     ):
         if status not in STATUSES:
             raise ValueError(f"Invalid status: {status}. Must be one of {STATUSES}")
@@ -116,8 +118,19 @@ class Story:
         self.child_tasks = child_tasks
         self.creator_id = creator_id
         self.assigned_user_id = assigned_user_id
-        self.due_date = due_date
-        self.created_at = created_at
+        if due_date is not None:
+            try:
+                datetime.fromisoformat(due_date)
+                self.due_date = due_date
+            except ValueError:
+                raise ValueError(
+                    f"Invalid due_date format: {due_date}. Must be ISO 8601 format (YYYY-MM-DDTHH:MM:SS+00:00)"
+                )
+        else:
+            self.due_date = None
+        self.created_at = (
+            created_at or datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+        )
 
     def to_dict(self) -> dict:
         return {
@@ -184,7 +197,7 @@ class Task:
         assigned_user_id: str = None,
         story_id: str = None,
         due_date: str = None,
-        created_at: str = datetime.date.today().isoformat(),
+        created_at: str = None,
     ):
         if status not in STATUSES:
             raise ValueError(f"Invalid status: {status}. Must be one of {STATUSES}")
@@ -195,8 +208,19 @@ class Task:
         self.status = status
         self.story_id = story_id
         self.assigned_user_id = assigned_user_id
-        self.due_date = due_date
-        self.created_at = created_at
+        if due_date is not None:
+            try:
+                datetime.fromisoformat(due_date)
+                self.due_date = due_date
+            except ValueError:
+                raise ValueError(
+                    f"Invalid due_date format: {due_date}. Must be ISO 8601 format (YYYY-MM-DDTHH:MM:SS+00:00)"
+                )
+        else:
+            self.due_date = None
+        self.created_at = (
+            created_at or datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+        )
 
     def to_dict(self) -> dict:
         return {
