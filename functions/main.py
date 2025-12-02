@@ -18,6 +18,8 @@ set_global_options(max_instances=10)
 
 initialize_app()
 
+# ========== ITEMS ==========
+
 
 # Epics
 @https_fn.on_call()
@@ -268,6 +270,29 @@ def update_task(req: https_fn.Request) -> https_fn.Response:
         raise https_fn.HttpsError("internal", f"Error updating task: {e}")
 
 
+# ========= USER MANAGEMENT ==========
+@https_fn.on_request()
+def get_uid(req: https_fn.Request):
+    """A function that gets the UID of a user based on their email"""
+    email = req.args.get("email")
+    if not email:
+        return https_fn.Response("Missing email", status=400)
+
+    uid = fetch_uid_by_email(email)
+    if not uid:
+        return https_fn.Response("User not found", status=404)
+
+    return uid
+
+
+def fetch_uid_by_email(email: str) -> str:
+    try:
+        user = auth.get_user_by_email(email)
+        return user.uid
+    except auth.UserNotFoundError:
+        return None
+
+
 # Helpers
 def get_tasks_from_db(query_params: dict) -> list:
     # Fetch tasks from Firestore based on the query parameters
@@ -357,3 +382,50 @@ def patch_epic_in_db_with_fields(id: str, update_data: dict) -> Epic:
     epic_ref.update(update_data)
     epic = Epic.from_firestore(epic_ref.get())
     return epic
+
+
+# ========== DAILY SCHEDULE ==========
+@https_fn.on_request()
+def get_schedule(req: https_fn.Request) -> https_fn.Response:
+    """A function that gets a user's daily schedule"""
+    user_id = req.args.get("user_id")
+    if not user_id:
+        return https_fn.Response("Missing user_id", status=400)
+
+    # Fetch the user's schedule from the database
+    schedule = get_user_schedule(user_id)
+    return https_fn.Response(schedule)
+
+
+@https_fn.on_request()
+def update_schedule(req: https_fn.Request) -> https_fn.Response:
+    """A function that updates a user's daily schedule"""
+    if req.method != "POST":
+        return https_fn.Response("Invalid request method", status=400)
+
+    user_id = req.args.get("user_id")
+    if not user_id:
+        return https_fn.Response("Missing user_id", status=400)
+
+    schedule_data = json.loads(req.data).get("schedule")
+    if not schedule_data:
+        return https_fn.Response("Missing schedule data", status=400)
+
+    try:
+        update_user_schedule(user_id, schedule_data)
+        return https_fn.Response("Schedule updated successfully", status=200)
+    except Exception as e:
+        return https_fn.Response(f"Error updating schedule: {e}", status=500)
+
+
+# ========= HELPERS FOR SCHEDULE ==========
+def get_user_schedule(user_id: str) -> dict:
+    # Placeholder function to fetch user schedule from the database
+    # Replace with actual database fetching logic
+    return {"user_id": user_id, "schedule": "Sample Schedule"}
+
+
+def update_user_schedule(user_id: str, schedule_data: dict) -> None:
+    # Placeholder function to update user schedule in the database
+    # Replace with actual database updating logic
+    pass
