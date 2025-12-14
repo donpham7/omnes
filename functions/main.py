@@ -282,7 +282,7 @@ def get_uid(req: https_fn.Request):
     if not uid:
         return https_fn.Response("User not found", status=404)
 
-    return uid
+    return {"uid": uid}
 
 
 def fetch_uid_by_email(email: str) -> str:
